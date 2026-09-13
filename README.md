@@ -18,6 +18,7 @@ MQTT Discovery creates:
 
 - `sensor.galim_pro_homework`: number of active tasks
 - Attributes: normalized task list, total count, and last update time
+- `button.galim_pro_check_homework`: request an immediate homework check
 
 New tasks are also emitted as non-retained JSON on `galim_pro/homework/new`.
 

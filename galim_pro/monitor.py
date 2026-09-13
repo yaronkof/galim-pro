@@ -34,6 +34,8 @@ class GalimMonitor:
         self.seen = SeenTasks(settings.data_dir / "seen_tasks.json")
         self.client: GalimClient | None = None
         self.stop_event = threading.Event()
+        self.wake_event = threading.Event()
+        self.publisher.set_check_callback(self.request_check)
         try:
             self.timezone = ZoneInfo(settings.timezone)
         except ZoneInfoNotFoundError as exc:
@@ -81,14 +83,21 @@ class GalimMonitor:
             self.publisher.publish_new_tasks(new_tasks)
         LOGGER.info("Published %d task(s); %d new", len(tasks), len(new_tasks))
 
+    def request_check(self) -> None:
+        self.wake_event.set()
+
     def run(self) -> None:
         self.publisher.publish_discovery()
         while not self.stop_event.is_set():
             next_poll = self.next_poll_at()
             wait_seconds = max((next_poll - datetime.now(self.timezone)).total_seconds(), 1)
             LOGGER.info("Next homework poll scheduled for %s", next_poll.isoformat())
-            if self.stop_event.wait(wait_seconds):
+            manual_check = self.wake_event.wait(wait_seconds)
+            self.wake_event.clear()
+            if self.stop_event.is_set():
                 break
+            if manual_check:
+                LOGGER.info("Running a manually requested homework check")
             try:
                 self.poll_once()
             except GalimApiError as exc:
@@ -100,6 +109,7 @@ class GalimMonitor:
 
     def stop(self, *_args) -> None:
         self.stop_event.set()
+        self.wake_event.set()
 
     def close(self) -> None:
         if self.client:

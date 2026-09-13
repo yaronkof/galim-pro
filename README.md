@@ -72,7 +72,8 @@ sensitive. The monitor never logs credentials or the LMS `SID` cookie.
 | `MQTT_PORT` | no | `1883` | MQTT broker port |
 | `MQTT_USERNAME` | no | — | MQTT username |
 | `MQTT_PASSWORD` | no | — | MQTT password |
-| `POLL_INTERVAL_MINUTES` | no | `30` | Poll interval |
+| `TZ` | no | `Asia/Jerusalem` | Timezone used by the schedule |
+| `SCHEDULES` | no | `13:00,15:00,19:00` | Comma-separated daily poll times |
 | `SEED_QUIETLY` | no | `true` | Suppress new-task event on first poll |
 | `HEADLESS` | no | `true` | Run Chromium without a visible window |
 | `DATA_DIR` | no | `/app/data` | Persistent private state directory |
@@ -100,4 +101,3 @@ ruff check .
 ## License
 
 MIT
-

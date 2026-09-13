@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import signal
 import threading
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .auth import GalimAuthenticator
 from .client import GalimApiError, GalimClient, GalimSessionExpired
@@ -32,6 +34,24 @@ class GalimMonitor:
         self.seen = SeenTasks(settings.data_dir / "seen_tasks.json")
         self.client: GalimClient | None = None
         self.stop_event = threading.Event()
+        try:
+            self.timezone = ZoneInfo(settings.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(f"Unknown timezone: {settings.timezone}") from exc
+
+    def next_poll_at(self, now: datetime | None = None) -> datetime:
+        current = now or datetime.now(self.timezone)
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=self.timezone)
+        candidates = []
+        for days_ahead in (0, 1):
+            date = current.date() + timedelta(days=days_ahead)
+            for value in self.settings.schedules:
+                hour, minute = (int(part) for part in value.split(":"))
+                candidate = datetime.combine(date, time(hour, minute), self.timezone)
+                if candidate > current:
+                    candidates.append(candidate)
+        return min(candidates)
 
     def _login(self, *, clear_saved_session: bool = False) -> None:
         if clear_saved_session:
@@ -63,8 +83,12 @@ class GalimMonitor:
 
     def run(self) -> None:
         self.publisher.publish_discovery()
-        interval_seconds = self.settings.poll_interval_minutes * 60
         while not self.stop_event.is_set():
+            next_poll = self.next_poll_at()
+            wait_seconds = max((next_poll - datetime.now(self.timezone)).total_seconds(), 1)
+            LOGGER.info("Next homework poll scheduled for %s", next_poll.isoformat())
+            if self.stop_event.wait(wait_seconds):
+                break
             try:
                 self.poll_once()
             except GalimApiError as exc:
@@ -73,7 +97,6 @@ class GalimMonitor:
             except Exception:
                 LOGGER.exception("Unexpected monitor failure")
                 self.publisher.publish_unavailable()
-            self.stop_event.wait(interval_seconds)
 
     def stop(self, *_args) -> None:
         self.stop_event.set()

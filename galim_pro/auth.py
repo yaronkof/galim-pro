@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from playwright.sync_api import BrowserContext, Page, sync_playwright
 
@@ -54,6 +55,17 @@ class GalimAuthenticator:
     def _synchronize_lms(page: Page) -> None:
         page.goto(LMS_PERSONAL_URL, wait_until="networkidle", timeout=60_000)
 
+    @staticmethod
+    def _safe_page_location(page: Page) -> str:
+        """Describe a failed page without logging query strings or fragments."""
+        try:
+            parsed = urlsplit(page.url)
+            location = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+            title = page.title().strip()[:100]
+            return f"{location} (title={title!r})"
+        except Exception:
+            return "unavailable"
+
     def login(self) -> str:
         """Return a valid LMS SID, reusing browser state before interactive login."""
         with sync_playwright() as playwright:
@@ -88,7 +100,10 @@ class GalimAuthenticator:
             except GalimAuthenticationError:
                 raise
             except Exception as exc:
-                raise GalimAuthenticationError(f"Galim login failed: {exc}") from exc
+                location = self._safe_page_location(page)
+                raise GalimAuthenticationError(
+                    f"Galim login failed at {location}: {exc}"
+                ) from exc
             finally:
                 context.close()
                 browser.close()
@@ -96,4 +111,3 @@ class GalimAuthenticator:
     def clear_saved_session(self) -> None:
         if self.storage_state_path.exists():
             self.storage_state_path.unlink()
-

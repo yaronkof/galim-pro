@@ -26,3 +26,16 @@ def test_next_poll_rolls_to_tomorrow_after_last_time():
     assert monitor.next_poll_at(now) == datetime(
         2026, 9, 14, 13, 0, tzinfo=monitor.timezone
     )
+
+
+def test_publish_next_check_uses_rollover_result():
+    monitor = _monitor_with_schedule("13:00", "15:00", "19:00")
+    published = []
+    monitor.publisher = SimpleNamespace(publish_next_check=published.append)
+    now = datetime(2026, 9, 13, 21, 0, tzinfo=monitor.timezone)
+
+    result = monitor.publish_next_check(now)
+
+    expected = datetime(2026, 9, 14, 13, 0, tzinfo=monitor.timezone)
+    assert result == expected
+    assert published == [expected]

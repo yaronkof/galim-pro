@@ -14,6 +14,11 @@ LOGGER = logging.getLogger(__name__)
 DISCOVERY_TOPIC = "homeassistant/sensor/galim_pro_homework/config"
 STATE_TOPIC = "galim_pro/homework/state"
 ATTRIBUTES_TOPIC = "galim_pro/homework/attributes"
+LAST_CHECK_DISCOVERY_TOPIC = "homeassistant/sensor/galim_pro_last_homework_check/config"
+LAST_CHECK_STATE_TOPIC = "galim_pro/homework/last_check/state"
+LAST_CHECK_ATTRIBUTES_TOPIC = "galim_pro/homework/last_check/attributes"
+NEXT_CHECK_DISCOVERY_TOPIC = "homeassistant/sensor/galim_pro_next_homework_check/config"
+NEXT_CHECK_STATE_TOPIC = "galim_pro/homework/next_check/state"
 AVAILABILITY_TOPIC = "galim_pro/status"
 EVENT_TOPIC = "galim_pro/homework/new"
 CHECK_COMMAND_TOPIC = "galim_pro/homework/check"
@@ -85,10 +90,39 @@ class GalimMqttPublisher:
             "icon": "mdi:refresh",
             "device": device,
         }
+        last_check_payload = {
+            "name": "Galim Pro Last Homework Check",
+            "unique_id": "galim_pro_last_homework_check",
+            "state_topic": LAST_CHECK_STATE_TOPIC,
+            "json_attributes_topic": LAST_CHECK_ATTRIBUTES_TOPIC,
+            "availability_topic": AVAILABILITY_TOPIC,
+            "device_class": "timestamp",
+            "icon": "mdi:clock-check-outline",
+            "device": device,
+        }
+        next_check_payload = {
+            "name": "Galim Pro Next Homework Check",
+            "unique_id": "galim_pro_next_homework_check",
+            "state_topic": NEXT_CHECK_STATE_TOPIC,
+            "availability_topic": AVAILABILITY_TOPIC,
+            "device_class": "timestamp",
+            "icon": "mdi:clock-outline",
+            "device": device,
+        }
         self.client.publish(DISCOVERY_TOPIC, json.dumps(sensor_payload), retain=True)
         self.client.publish(
             BUTTON_DISCOVERY_TOPIC,
             json.dumps(button_payload),
+            retain=True,
+        )
+        self.client.publish(
+            LAST_CHECK_DISCOVERY_TOPIC,
+            json.dumps(last_check_payload),
+            retain=True,
+        )
+        self.client.publish(
+            NEXT_CHECK_DISCOVERY_TOPIC,
+            json.dumps(next_check_payload),
             retain=True,
         )
         self.client.publish(AVAILABILITY_TOPIC, "online", retain=True)
@@ -117,6 +151,39 @@ class GalimMqttPublisher:
             retain=False,
         )
 
+    def publish_last_check(
+        self,
+        completed_at: datetime,
+        *,
+        source: str,
+        success: bool,
+        tasks_published: int,
+        new_tasks: int,
+        error_summary: str | None = None,
+    ) -> None:
+        state = _timestamp_state(completed_at)
+        attributes = {
+            "source": source,
+            "success": success,
+            "tasks_published": tasks_published,
+            "new_tasks": new_tasks,
+        }
+        if error_summary:
+            attributes["error_summary"] = error_summary
+        self.client.publish(LAST_CHECK_STATE_TOPIC, state, retain=True)
+        self.client.publish(
+            LAST_CHECK_ATTRIBUTES_TOPIC,
+            json.dumps(attributes),
+            retain=True,
+        )
+
+    def publish_next_check(self, scheduled_at: datetime) -> None:
+        self.client.publish(
+            NEXT_CHECK_STATE_TOPIC,
+            _timestamp_state(scheduled_at),
+            retain=True,
+        )
+
     def publish_unavailable(self) -> None:
         self.client.publish(AVAILABILITY_TOPIC, "offline", retain=True)
 
@@ -126,3 +193,9 @@ class GalimMqttPublisher:
         finally:
             self.client.loop_stop()
             self.client.disconnect()
+
+
+def _timestamp_state(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("MQTT timestamp states must be timezone-aware")
+    return value.isoformat(timespec="seconds")

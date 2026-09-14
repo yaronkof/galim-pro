@@ -19,6 +19,13 @@ MQTT Discovery creates:
 - `sensor.galim_pro_homework`: number of active tasks
 - Attributes: normalized task list, total count, and last update time
 - `button.galim_pro_check_homework`: request an immediate homework check
+- `sensor.galim_pro_last_homework_check`: timezone-aware completion timestamp for
+  every manual or scheduled check. Its attributes report the source, whether the
+  check succeeded, task and new-task counts, and a generic safe error summary on
+  failure.
+- `sensor.galim_pro_next_homework_check`: timezone-aware timestamp of the next
+  configured scheduled check. It is published at startup and advanced after a
+  scheduled check; pressing the manual-check button does not change it.
 
 New tasks are also emitted as non-retained JSON on `galim_pro/homework/new`.
 

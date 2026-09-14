@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 import signal
 import threading
+from dataclasses import dataclass
 from datetime import datetime, time, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .auth import GalimAuthenticator
@@ -13,6 +15,14 @@ from .mqtt import GalimMqttPublisher
 from .state import SeenTasks
 
 LOGGER = logging.getLogger(__name__)
+
+CheckSource = Literal["manual", "scheduled"]
+
+
+@dataclass(frozen=True)
+class CheckResult:
+    tasks_published: int
+    new_tasks: int
 
 
 class GalimMonitor:
@@ -64,7 +74,7 @@ class GalimMonitor:
         self.client = GalimClient(sid)
         LOGGER.info("Galim LMS session is ready")
 
-    def poll_once(self) -> None:
+    def poll_once(self) -> CheckResult:
         if self.client is None:
             self._login()
         assert self.client is not None
@@ -82,30 +92,61 @@ class GalimMonitor:
         if not (first_poll and self.settings.seed_quietly):
             self.publisher.publish_new_tasks(new_tasks)
         LOGGER.info("Published %d task(s); %d new", len(tasks), len(new_tasks))
+        return CheckResult(tasks_published=len(tasks), new_tasks=len(new_tasks))
 
     def request_check(self) -> None:
         self.wake_event.set()
 
+    def publish_next_check(self, now: datetime | None = None) -> datetime:
+        next_poll = self.next_poll_at(now)
+        self.publisher.publish_next_check(next_poll)
+        return next_poll
+
+    def run_check(self, source: CheckSource) -> None:
+        success = False
+        tasks_published = 0
+        new_tasks = 0
+        error_summary: str | None = None
+        try:
+            result = self.poll_once()
+            success = True
+            tasks_published = result.tasks_published
+            new_tasks = result.new_tasks
+        except GalimApiError:
+            LOGGER.error("Galim API error while checking homework")
+            error_summary = "Galim API request failed"
+            self.publisher.publish_unavailable()
+        except Exception as exc:
+            LOGGER.error("Unexpected monitor failure (%s)", type(exc).__name__)
+            error_summary = "Unexpected monitor failure"
+            self.publisher.publish_unavailable()
+        finally:
+            self.publisher.publish_last_check(
+                datetime.now(self.timezone),
+                source=source,
+                success=success,
+                tasks_published=tasks_published,
+                new_tasks=new_tasks,
+                error_summary=error_summary,
+            )
+
     def run(self) -> None:
         self.publisher.publish_discovery()
+        next_poll = self.publish_next_check()
+        LOGGER.info("Next homework poll scheduled for %s", next_poll.isoformat())
         while not self.stop_event.is_set():
-            next_poll = self.next_poll_at()
-            wait_seconds = max((next_poll - datetime.now(self.timezone)).total_seconds(), 1)
-            LOGGER.info("Next homework poll scheduled for %s", next_poll.isoformat())
+            wait_seconds = max((next_poll - datetime.now(self.timezone)).total_seconds(), 0)
             manual_check = self.wake_event.wait(wait_seconds)
             self.wake_event.clear()
             if self.stop_event.is_set():
                 break
+            source: CheckSource = "manual" if manual_check else "scheduled"
             if manual_check:
                 LOGGER.info("Running a manually requested homework check")
-            try:
-                self.poll_once()
-            except GalimApiError as exc:
-                LOGGER.error("Galim API error: %s", exc)
-                self.publisher.publish_unavailable()
-            except Exception:
-                LOGGER.exception("Unexpected monitor failure")
-                self.publisher.publish_unavailable()
+            self.run_check(source)
+            if source == "scheduled":
+                next_poll = self.publish_next_check()
+                LOGGER.info("Next homework poll scheduled for %s", next_poll.isoformat())
 
     def stop(self, *_args) -> None:
         self.stop_event.set()

@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+data/
+config.json
+login.py
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+tests/
+README.md
+requirements-dev.txt

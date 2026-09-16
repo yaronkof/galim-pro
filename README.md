@@ -39,6 +39,10 @@ right-to-left Hebrew card with formatted due dates, copy
 into a Lovelace dashboard. The example also includes the existing manual
 refresh button and sorts assignments by due date.
 
+#### Dashboard preview
+
+![Galim Pro Hebrew Home Assistant dashboard](docs/dashboard-preview.png)
+
 ## Requirements
 
 - Docker with Docker Compose

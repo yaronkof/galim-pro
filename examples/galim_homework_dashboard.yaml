@@ -1,0 +1,140 @@
+# Home Assistant Lovelace card for Galim Pro homework.
+# Required HACS frontend cards:
+# - config-template-card
+# - html-card
+# The entity IDs below match the default MQTT Discovery IDs used by this project.
+type: vertical-stack
+cards:
+  - type: button
+    entity: button.galim_pro_check_homework
+    name: עדכון שיעורי בית
+    icon: mdi:refresh-circle
+    show_state: false
+    icon_height: 48px
+    tap_action:
+      action: call-service
+      service: button.press
+      target:
+        entity_id: button.galim_pro_check_homework
+
+  - type: custom:config-template-card
+    entities:
+      - sensor.galim_pro_galim_pro_homework
+    card:
+      type: custom:html-card
+      content: >-
+        ${(() => {
+          const entityId = 'sensor.galim_pro_galim_pro_homework';
+          const entity = states[entityId];
+
+          if (!entity || !entity.attributes) {
+            return `
+              <div dir="rtl" style="direction:rtl;text-align:right;padding:16px;">
+                אין נתונים להצגה
+              </div>
+            `;
+          }
+
+          const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+          const items = Array.isArray(entity.attributes.items)
+            ? entity.attributes.items
+            : [];
+
+          if (!items.length) {
+            return `
+              <div dir="rtl" style="direction:rtl;text-align:right;padding:16px;">
+                <div style="font-size:18px;font-weight:700;">
+                  📚 שיעורי בית
+                </div>
+                <div style="margin-top:12px;opacity:.75;">
+                  ✅ אין שיעורי בית פתוחים
+                </div>
+              </div>
+            `;
+          }
+
+          const formatDate = (value) => {
+            if (!value) return '';
+
+            const text = String(value);
+            const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(text);
+            const date = new Date(dateOnly ? `${text}T00:00:00` : text);
+
+            if (Number.isNaN(date.getTime())) {
+              return escapeHtml(value);
+            }
+
+            return new Intl.DateTimeFormat('he-IL', {
+              dateStyle: 'full',
+              timeStyle: dateOnly ? undefined : 'short'
+            }).format(date);
+          };
+
+          const rows = items
+            .map((item) => ({
+              name: item?.name || 'תרגיל',
+              subject: item?.subject || '',
+              due: item?.due_at || '',
+              url: item?.url || '',
+              timestamp: item?.due_at
+                ? new Date(item.due_at).getTime()
+                : Number.MAX_SAFE_INTEGER
+            }))
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+          let html = `
+            <div dir="rtl"
+                 style="direction:rtl;text-align:right;padding:4px 2px;font-family:inherit;">
+              <div style="font-size:20px;font-weight:700;margin-bottom:4px;">
+                📚 שיעורי בית
+              </div>
+              <div style="opacity:.7;font-size:13px;margin-bottom:14px;">
+                ${items.length} ${items.length === 1 ? 'תרגיל פתוח' : 'תרגילים פתוחים'}
+              </div>
+          `;
+
+          rows.forEach((item) => {
+            html += `
+              <div style="direction:rtl;text-align:right;margin:10px 0;padding:14px;border-radius:12px;background:var(--secondary-background-color);border-right:4px solid var(--primary-color);">
+                <div style="font-size:17px;font-weight:700;margin-bottom:8px;">
+                  📘 ${escapeHtml(item.name)}
+                </div>
+            `;
+
+            if (item.subject) {
+              html += `
+                <div style="margin:5px 0;">
+                  📖 <b>מקצוע:</b> ${escapeHtml(item.subject)}
+                </div>
+              `;
+            }
+
+            if (item.due) {
+              html += `
+                <div style="margin:5px 0;">
+                  ⏰ <b>להגיש עד:</b> ${formatDate(item.due)}
+                </div>
+              `;
+            }
+
+            if (item.url) {
+              html += `
+                <div style="margin-top:9px;">
+                  🔗 <a href="${escapeHtml(item.url)}" target="_blank" style="font-weight:600;">
+                    פתיחת התרגיל
+                  </a>
+                </div>
+              `;
+            }
+
+            html += '</div>';
+          });
+
+          return `${html}</div>`;
+        })()}

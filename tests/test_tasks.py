@@ -26,3 +26,16 @@ def test_task_identity_without_id_is_stable():
     task = {"name": "Task", "dueDate": "2026-09-14"}
     assert task_identity(task) == task_identity(dict(reversed(list(task.items()))))
 
+
+def test_normalize_task_reads_safe_lesson_fields_from_nested_payload():
+    task = {
+        "lesson": {"lessonName": "Algebra", "subjectName": "Math"},
+        "metadata": {"lessonDate": "2026-09-16"},
+        "cookie": "must-not-leak",
+    }
+    assert normalize_task(task) == {
+        "name": "Algebra",
+        "subject": "Math",
+        "assigned_at": "2026-09-16",
+    }
+

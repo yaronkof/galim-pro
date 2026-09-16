@@ -29,11 +29,34 @@ MQTT Discovery creates:
 
 New tasks are also emitted as non-retained JSON on `galim_pro/homework/new`.
 
+### Recommended Hebrew dashboard card
+
+The integration publishes normalized task data as attributes. For a readable
+right-to-left Hebrew card with formatted due dates, copy
+[`examples/galim_homework_dashboard.yaml`](examples/galim_homework_dashboard.yaml)
+into a Lovelace dashboard. The example also includes the existing manual
+refresh button and sorts assignments by due date.
+
 ## Requirements
 
 - Docker with Docker Compose
 - A Home Assistant MQTT broker, typically the Mosquitto broker add-on
 - Galim Pro access through a Ministry of Education account
+
+### Home Assistant dashboard prerequisites
+
+The MQTT entities work without any frontend add-ons. The example Hebrew card
+requires these HACS frontend cards:
+
+1. Install **Config Template Card** (`custom:config-template-card`).
+2. Install **HTML Card** (`custom:html-card`).
+3. Add the resources supplied by HACS as Lovelace resources (or enable HACS
+   automatic resource loading), then reload the browser.
+
+Card-mod is not required by the example card. If the generated entity ID in an
+existing dashboard differs, check **Developer Tools → States** and replace
+`sensor.galim_pro_galim_pro_homework` in the example; the MQTT Discovery
+unique ID and existing button behavior remain unchanged.
 
 ## Setup
 
@@ -59,6 +82,10 @@ New tasks are also emitted as non-retained JSON on `galim_pro/homework/new`.
 
 The sensor should appear automatically after the first successful MQTT
 connection and poll.
+
+After installation, use the **עדכון שיעורי בית** button in the example card
+for an immediate manual check. The card updates when the retained MQTT state
+and attributes are published.
 
 ## Session handling
 

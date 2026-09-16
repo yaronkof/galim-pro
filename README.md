@@ -9,8 +9,10 @@ Galim LMS API, and publishes it to Home Assistant through MQTT Discovery.
 ## Status
 
 The login and `/personal_api/tasks` request have been verified with a real
-account. The account had no assignments at the time, so field mapping will be
-confirmed and adjusted when the first real task payload is available.
+account and a live homework payload. Safe field mapping is working, including
+lesson names, subjects, due dates, and links. The MQTT entities and the Hebrew
+right-to-left Home Assistant dashboard card have also been tested in a live
+Home Assistant installation.
 
 ## Home Assistant entities
 

@@ -6,7 +6,7 @@ Galim LMS API, and publishes it to Home Assistant through MQTT Discovery.
 > This project is not affiliated with Galim or the Israeli Ministry of
 > Education. Use it only with an account you are authorized to access.
 
-This project was developed by Yaron Kofman in collaboration with ChatGPT
+This project was developed by Yaron K in collaboration with ChatGPT
 (OpenAI), using OpenAI models for design, implementation, testing, and
 documentation.
 
